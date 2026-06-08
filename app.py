@@ -4,8 +4,13 @@ import json
 import csv
 import random
 
+# --- CONFIGURATION ---
+USE_TEAMS = False  # Set to True to enable team groupings, abbreviations, and colors
+
+# --- Page Configuration ---
 st.set_page_config(page_title="NBA 2K Roster Database", layout="wide")
 
+# Lock and resize sidebar via CSS
 st.markdown(
     """
     <style>
@@ -103,16 +108,22 @@ def load_data():
     for row in data:
         j_name, j_age, j_rating, j_pos = row.get("name", ""), str(row.get("age", "")), str(row.get("rating", "")), row.get("pos", "")
         
-        current_rating = int(j_rating) if j_rating.isdigit() else 0
-        if current_rating > prev_rating:
-            team_idx = min(team_idx + 1, len(NBA_TEAMS) - 1)
-        prev_rating, curr_team = current_rating, NBA_TEAMS[team_idx]
-        
         full_name, csv_pos = get_match_data(j_name, j_age, j_rating, j_pos)
         pri_pos, sec_pos = csv_pos.split('/', 1) if '/' in csv_pos else (csv_pos, "N/A")
         
-        players.append({
-            "NAME": full_name, "TEAM": curr_team["abbr"],
+        player_data = {
+            "NAME": full_name,
+        }
+        
+        # Insert TEAM conditionally right after NAME
+        if USE_TEAMS:
+            current_rating = int(j_rating) if j_rating.isdigit() else 0
+            if current_rating > prev_rating:
+                team_idx = min(team_idx + 1, len(NBA_TEAMS) - 1)
+            prev_rating, curr_team = current_rating, NBA_TEAMS[team_idx]
+            player_data["TEAM"] = curr_team["abbr"]
+
+        player_data.update({
             "PRI": pri_pos.strip(), "SEC": sec_pos.strip(),
             "AGE": int(j_age) if j_age.isdigit() else 0,
             "RATING": int(j_rating) if j_rating.isdigit() else 0,
@@ -120,16 +131,26 @@ def load_data():
             "POST D": row.get("post_d", ""), "PER D": row.get("per_d", ""), "PLAY": row.get("play", ""),
             "REB": row.get("reb", ""), "ATHL": row.get("athl", ""), "IQ": row.get("iq", ""), "POT": row.get("pot", "")
         })
+        
+        players.append(player_data)
     
     df = pd.DataFrame(players)
     
-    df['PRI'] = pd.Categorical(df['PRI'], categories=[p for p in pos_order if p != 'N/A'], ordered=True)
-    df['SEC'] = pd.Categorical(df['SEC'], categories=pos_order, ordered=True)
+    # Sort by overall rating if not grouping by team
+    if not USE_TEAMS and not df.empty:
+        df = df.sort_values(by="RATING", ascending=False).reset_index(drop=True)
     
-    for col in grade_cols:
-        df[col] = pd.Categorical(df[col], categories=grade_order, ordered=True)
+    # Apply Categorical sorting for positions and grades
+    if not df.empty:
+        df['PRI'] = pd.Categorical(df['PRI'], categories=[p for p in pos_order if p != 'N/A'], ordered=True)
+        df['SEC'] = pd.Categorical(df['SEC'], categories=pos_order, ordered=True)
+        
+        for col in grade_cols:
+            df[col] = pd.Categorical(df[col], categories=grade_order, ordered=True)
+            
     return df
 
+# --- UI Setup ---
 st.title("NBA 2K MORDVA Roster Database")
 
 df = load_data()
@@ -137,8 +158,13 @@ if df.empty:
     st.error("No players loaded. Ensure `grades.json` and `player_names.csv` exist in the root folder.")
     st.stop()
 
+# --- Sidebar ---
 st.sidebar.header("Controls & Filters")
-use_colors = st.sidebar.checkbox("Use Team Colors", value=True)
+
+if USE_TEAMS:
+    use_colors = st.sidebar.checkbox("Use Team Colors", value=True)
+else:
+    use_colors = False
 
 search_terms = st.sidebar.text_input("Search Name:").lower().split()
 
@@ -164,6 +190,7 @@ if st.sidebar.button("Clear Filters"):
 for i, f in enumerate(st.session_state.filters):
     st.sidebar.caption(f"✓ {f['col']} {f['op']} {f['val']}")
 
+# --- Filtering Logic ---
 filtered_df = df.copy()
 
 if search_terms:
@@ -189,12 +216,13 @@ for f in st.session_state.filters:
             elif op == "<=": filtered_df = filtered_df[filtered_df[col] <= val]
             elif op == "==": filtered_df = filtered_df[filtered_df[col] == val]
 
+# --- Display Dataframe ---
 def apply_team_colors(row):
-    bg_color = team_color_map.get(row['TEAM'], '#ffffff')
+    bg_color = team_color_map.get(row.get('TEAM', ''), '#ffffff')
     text_color = get_text_color(bg_color)
     return [f'background-color: {bg_color}; color: {text_color}'] * len(row)
 
-if use_colors:
+if use_colors and USE_TEAMS:
     st.dataframe(filtered_df.style.apply(apply_team_colors, axis=1), use_container_width=True, hide_index=True, height=700)
 else:
     st.dataframe(filtered_df, use_container_width=True, hide_index=True, height=700)
