@@ -4,10 +4,8 @@ import json
 import csv
 import random
 
-# --- Page Configuration ---
 st.set_page_config(page_title="NBA 2K Roster Database", layout="wide")
 
-# Lock and resize sidebar via CSS
 st.markdown(
     """
     <style>
@@ -18,6 +16,11 @@ st.markdown(
     }
     [data-testid="stSidebarResizer"] {
         display: none;
+    }
+    @media (min-width: 768px) {
+        [data-testid="stDataFrameContainer"], [data-testid="stDataFrame"] {
+            width: auto !important;
+        }
     }
     </style>
     """,
@@ -120,7 +123,6 @@ def load_data():
     
     df = pd.DataFrame(players)
     
-    # Categorical sorts
     df['PRI'] = pd.Categorical(df['PRI'], categories=[p for p in pos_order if p != 'N/A'], ordered=True)
     df['SEC'] = pd.Categorical(df['SEC'], categories=pos_order, ordered=True)
     
@@ -128,7 +130,6 @@ def load_data():
         df[col] = pd.Categorical(df[col], categories=grade_order, ordered=True)
     return df
 
-# --- UI Setup ---
 st.title("NBA 2K MORDVA Roster Database")
 
 df = load_data()
@@ -136,7 +137,6 @@ if df.empty:
     st.error("No players loaded. Ensure `grades.json` and `player_names.csv` exist in the root folder.")
     st.stop()
 
-# --- Sidebar ---
 st.sidebar.header("Controls & Filters")
 use_colors = st.sidebar.checkbox("Use Team Colors", value=True)
 
@@ -164,7 +164,6 @@ if st.sidebar.button("Clear Filters"):
 for i, f in enumerate(st.session_state.filters):
     st.sidebar.caption(f"✓ {f['col']} {f['op']} {f['val']}")
 
-# --- Filtering Logic ---
 filtered_df = df.copy()
 
 if search_terms:
@@ -190,7 +189,6 @@ for f in st.session_state.filters:
             elif op == "<=": filtered_df = filtered_df[filtered_df[col] <= val]
             elif op == "==": filtered_df = filtered_df[filtered_df[col] == val]
 
-# --- Display Dataframe ---
 def apply_team_colors(row):
     bg_color = team_color_map.get(row['TEAM'], '#ffffff')
     text_color = get_text_color(bg_color)
