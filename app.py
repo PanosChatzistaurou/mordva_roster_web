@@ -7,6 +7,23 @@ import random
 # --- Page Configuration ---
 st.set_page_config(page_title="NBA 2K Roster Database", layout="wide")
 
+# Lock and resize sidebar via CSS
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] {
+        min-width: 350px !important;
+        max-width: 350px !important;
+        width: 350px !important;
+    }
+    [data-testid="stSidebarResizer"] {
+        display: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 NBA_TEAMS = [
     {"abbr": "ATL", "color": "#E03A3E"}, {"abbr": "BOS", "color": "#007A33"},
     {"abbr": "BKN", "color": "#000000"}, {"abbr": "CHA", "color": "#00788C"},
@@ -26,6 +43,7 @@ NBA_TEAMS = [
 ]
 
 team_color_map = {team["abbr"]: team["color"] for team in NBA_TEAMS}
+pos_order = ['PG', 'SG', 'SF', 'PF', 'C', 'N/A']
 grade_order = ['F', 'D-', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+']
 grade_cols = ["IN", "MID", "3PT", "POST D", "PER D", "PLAY", "REB", "ATHL", "IQ", "POT"]
 
@@ -102,7 +120,10 @@ def load_data():
     
     df = pd.DataFrame(players)
     
-    # Convert letter grades to Ordered Categories so Streamlit sorts them correctly natively!
+    # Categorical sorts
+    df['PRI'] = pd.Categorical(df['PRI'], categories=[p for p in pos_order if p != 'N/A'], ordered=True)
+    df['SEC'] = pd.Categorical(df['SEC'], categories=pos_order, ordered=True)
+    
     for col in grade_cols:
         df[col] = pd.Categorical(df[col], categories=grade_order, ordered=True)
     return df
