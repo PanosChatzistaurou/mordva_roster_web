@@ -135,9 +135,7 @@ def load_data():
     
     df = pd.DataFrame(players)
     
-    if not USE_TEAMS and not df.empty:
-        df = df.sort_values(by="RATING", ascending=False).reset_index(drop=True)
-    
+    # Establish perfectly ordered categories for backend sorting
     if not df.empty:
         df['PRI'] = pd.Categorical(df['PRI'], categories=[p for p in pos_order if p != 'N/A'], ordered=True)
         df['SEC'] = pd.Categorical(df['SEC'], categories=pos_order, ordered=True)
@@ -154,6 +152,7 @@ if df.empty:
     st.error("No players loaded. Ensure `grades.json` and `player_names.csv` exist in the root folder.")
     st.stop()
 
+# --- Sidebar ---
 st.sidebar.header("Controls & Filters")
 
 if USE_TEAMS:
@@ -167,6 +166,20 @@ st.sidebar.subheader("Positions")
 cols = st.sidebar.columns(5)
 selected_pos = [p for i, p in enumerate(["PG", "SG", "SF", "PF", "C"]) if cols[i].checkbox(p, value=True)]
 
+# --- Robust Backend Sorting ---
+st.sidebar.subheader("Sort Database")
+st.sidebar.caption("Use this for perfect grade/position sorting.")
+
+sort_options = list(df.columns)
+c_sort1, c_sort2 = st.sidebar.columns([3, 1])
+primary_sort = c_sort1.selectbox("Primary Sort", sort_options, index=sort_options.index("RATING"))
+asc_primary = c_sort2.checkbox("Asc", key="asc1", value=False)
+
+c_sort3, c_sort4 = st.sidebar.columns([3, 1])
+secondary_sort = c_sort3.selectbox("Secondary Sort", ["None"] + sort_options, index=0)
+asc_secondary = c_sort4.checkbox("Asc", key="asc2", value=False)
+
+# --- Advanced Filters ---
 st.sidebar.subheader("Advanced Filters")
 if "filters" not in st.session_state:
     st.session_state.filters = []
@@ -185,6 +198,7 @@ if st.sidebar.button("Clear Filters"):
 for i, f in enumerate(st.session_state.filters):
     st.sidebar.caption(f"✓ {f['col']} {f['op']} {f['val']}")
 
+# --- Filtering Logic ---
 filtered_df = df.copy()
 
 if search_terms:
@@ -210,18 +224,23 @@ for f in st.session_state.filters:
             elif op == "<=": filtered_df = filtered_df[filtered_df[col] <= val]
             elif op == "==": filtered_df = filtered_df[filtered_df[col] == val]
 
-# Handle display strings to force categorical sorting
-display_df = filtered_df.copy()
-grade_display_map = {g: ('\u200B' * i) + g for i, g in enumerate(grade_order)}
-for col in grade_cols:
-    display_df[col] = display_df[col].apply(lambda x: grade_display_map.get(x, x))
+# --- Apply Backend Sorting ---
+sort_cols = [primary_sort]
+sort_asc = [asc_primary]
 
+if secondary_sort != "None":
+    sort_cols.append(secondary_sort)
+    sort_asc.append(asc_secondary)
+
+filtered_df = filtered_df.sort_values(by=sort_cols, ascending=sort_asc).reset_index(drop=True)
+
+# --- Display Dataframe ---
 def apply_team_colors(row):
     bg_color = team_color_map.get(row.get('TEAM', ''), '#ffffff')
     text_color = get_text_color(bg_color)
     return [f'background-color: {bg_color}; color: {text_color}'] * len(row)
 
 if use_colors and USE_TEAMS:
-    st.dataframe(display_df.style.apply(apply_team_colors, axis=1), use_container_width=True, hide_index=True, height=700)
+    st.dataframe(filtered_df.style.apply(apply_team_colors, axis=1), use_container_width=True, hide_index=True, height=700)
 else:
-    st.dataframe(display_df, use_container_width=True, hide_index=True, height=700)
+    st.dataframe(filtered_df, use_container_width=True, hide_index=True, height=700)
