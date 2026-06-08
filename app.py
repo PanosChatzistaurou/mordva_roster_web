@@ -168,7 +168,7 @@ selected_pos = [p for i, p in enumerate(["PG", "SG", "SF", "PF", "C"]) if cols[i
 
 # --- Robust Backend Sorting ---
 st.sidebar.subheader("Sort Database")
-st.sidebar.caption("Use this for perfect grade/position sorting.")
+st.sidebar.caption("Use this for sorting Grades and Positions. Sorting on the table only works for Age, Rating and Names")
 
 sort_options = list(df.columns)
 c_sort1, c_sort2 = st.sidebar.columns([3, 1])
